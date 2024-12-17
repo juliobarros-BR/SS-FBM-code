@@ -16,7 +16,7 @@ class Model:
     def __init__(self, file_path):
         
         self.sys_var = self.initialize_variables_from_file(file_path)
-        
+        self.sys_var['period'] = self.sys_var.get('period')*self.sys_var.get('tau')
         # Initialize global properties
         
         self.total_slip     = 0
@@ -65,9 +65,10 @@ class Model:
 
                 # Split the line into variable and value using '=' as delimiter
                 variable, value_str = map(str.strip, line.split('=', 1))
-                # print(variable,value_str)
+                
                 # Check if the line starts with "moisture_data"
                 if variable == "moisture_df" and value_str:
+                    # print("here")
                     has_moisture_data = True
 
                 # Check if there's anything after the "=" sign for "load_data"
@@ -102,7 +103,7 @@ class Model:
     def update_total_strain(self):
         
         self.total_strain =  (self.total_slip + np.sum(self.local_creep))/(np.sum(self.local_intact)) + ((self.D_min +self.D_lin_coeff*self.normalized_moisture)*self.load )+ self.sys_var.get("alpha")*self.normalized_moisture
-        # print("computing strain",self.normalized_moisture,self.load,self.sys_var.get("alpha"),self.J_min,self.J_lin_coeff,self.total_strain)
+        # print("computing strain",self.normalized_moisture,self.load,self.sys_var.get("alpha"),self.J_min,self.J_lin_coeff,self.total_strain,self.total_slip)
         return
     
     def get_compliance(self):
@@ -155,23 +156,9 @@ class Model:
             
         return 
         
-    # @property()
+    
     def local_non_slip(self):
         return self.total_strain - self.local_slip
     
-    # def find_slip_idx(self):
-    # # For example, you might define bundle_strain as the sum of slip_th and local_creep
-    # bundle_strain = my_model.slip_th + my_model.local_creep
-
-    # # Compute the absolute difference between local_slip and bundle_strain
-    # diff = np.abs(my_model.local_slip - bundle_strain)
-
-    # # Identify indices where the difference is higher than local_thresholds
-    # high_threshold_indices = np.where(diff > local_thresholds)[0]
-
-    # # Categorize the differences into two cases based on local_slip
-    # higher_than_bundle = np.where(my_model.local_slip > bundle_strain)
-    # lower_than_bundle = np.where(my_model.local_slip < bundle_strain)
-
-    # return high_threshold_indices, higher_than_bundle, lower_than_bundle
+ 
 
