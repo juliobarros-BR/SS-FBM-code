@@ -26,7 +26,7 @@ class Simulate:
         else:
             self.moist_sequence, self.load_sequence, self.time_sequence = self.get_from_data_file(model.sys_var["moisture_df"],model.sys_var["load_df"])
             
-        self.load_sequence = list(np.array(self.load_sequence)[:]*10)
+        self.load_sequence = list(np.array(self.load_sequence)[:]*1)
         self.time_sequence = list(np.array(self.time_sequence)[:]*1)
         
         self.History = {
@@ -40,16 +40,19 @@ class Simulate:
                         "Slip_creep": [],
                         "Creep": [],
                         "Elastic": [],
-                        "Number_of_fibers": []
+                        "Number_of_fibers": [],
+                        "Load": [],
+                        "Moisture": []
                         }
         
     def update_history(self):
-        # print("oi")
     # Create a dictionary with the subarrays to be updated
         self.History["Total_strain"].append(self.model.total_strain)
         self.History["Slip_strain"].append(self.model.total_slip)
-        # print(self.current_time)
+        # print("current time",self.current_time)
         self.History["Time"].append(self.current_time)
+        self.History["Load"].append(self.current_load)
+        self.History["Moisture"].append(self.current_moist)
         # self.History["Avalanche_plus"].append(self.total_strain)
         # self.History["Avalanche_minus"].append(self.total_strain)
         # self.History["Slip_load"].append(self.total_strain)
@@ -71,11 +74,11 @@ class Simulate:
         sequence_time.extend([0])
         
         for _ in range(cycles_pre_load):
-            sequence_moist.extend([0, 1, 0])
-            sequence_load.extend([0, 0, 0])
+            sequence_moist.extend([0, 0, 1, 0])
+            sequence_load.extend([0, 0, 0, 0])
             
             last_time=sequence_time[-1]
-            sequence_time.extend([last_time, last_time + period, last_time + 2*period])
+            sequence_time.extend([last_time, last_time + period, last_time + 2*period, last_time + 3*period])
     
         # Loading:
             
@@ -84,10 +87,10 @@ class Simulate:
         sequence_time.append(sequence_time[-1])
     
         for _ in range(cycles_loaded):
-            sequence_moist.extend([0, 1, 0])
-            sequence_load.extend([1, 1, 1])
+            sequence_moist.extend([0, 0, 1, 0])
+            sequence_load.extend([1, 1, 1, 1])
             last_time=sequence_time[-1]
-            sequence_time.extend([last_time, last_time + period, last_time + 2*period])
+            sequence_time.extend([last_time, last_time + period, last_time + 2*period, last_time + 3*period])
             
         # Unloading:
         sequence_moist.append(0)  
@@ -95,10 +98,10 @@ class Simulate:
         sequence_time.append(sequence_time[-1])
     
         for _ in range(cycles_unload):
-            sequence_moist.extend([0, 1, 0])
-            sequence_load.extend([0, 0, 0])
+            sequence_moist.extend([0, 0, 1, 0])
+            sequence_load.extend([0, 0, 0, 0])
             last_time=sequence_time[-1]
-            sequence_time.extend([last_time, last_time + period, last_time + 2*period])
+            sequence_time.extend([last_time, last_time + period, last_time + 2*period, last_time + 3*period])
     
         return sequence_moist, sequence_load, sequence_time
     
@@ -139,21 +142,21 @@ class Simulate:
     def run(self):
         # print(self.time_sequence)
         for time_index, time_value in enumerate(self.time_sequence):
-            self.current_time = time_value
-            
+            self.current_time = time_value            
             self.current_load = self.load_sequence[time_index]
             self.current_moist = self.moist_sequence[time_index]
             prev_moist = self.moist_sequence[time_index-1]
             next_moist = self.moist_sequence[time_index]
             prev_load = self.load_sequence[time_index-1]
             next_load = self.load_sequence[time_index]
+            
             # print(prev_moist,next_moist,prev_load,next_load)
             try:
                 d_moisture = next_moist - prev_moist
                 d_load = next_load - prev_load
             except:
                 continue
-
+            # print(time_index, time_value, self.load_sequence)
             if d_moisture:
                 # print("moist",self.model.total_strain)
                 # Moisture is changing, optimize the variable accordingly
@@ -176,7 +179,8 @@ class Simulate:
             else:
                 # print("time")
                 self.evolve_time([self.time_sequence[time_index-1], time_value], 100)
-                
+            
+            # print(next_load)
             # # Run the optimize_fibers function after each iteration
             # self.optimize_fibers(self.model, self.local_thresholds, self.fail_limit)
             self.update_history()
@@ -197,13 +201,15 @@ class Simulate:
             # Check if the whole interval has an acceptable slip strain
             whole, halves = self.is_acceptable_interval(current_interval, fixed, flag)
             # print(whole.total_slip)
-            
-            if whole.total_slip - halves.total_slip <= 0.01*whole.total_slip :
+            # print(whole.total_slip,halves.total_slip)
+            if np.abs(whole.total_slip) - np.abs(halves.total_slip) <= np.abs(1*whole.total_slip) :
                 # Move to the next interval
+                print("Im here")
                 current_interval = [current_interval[1],final]
                 self.model = copy.deepcopy(whole)
             else:
                 # If not, halve the interval
+                print("Im there")
                 current_interval = [current_interval[0], current_interval[1] - (current_interval[1]-current_interval[0]) / 2]
             if count==999:
                 print("stuck here")
@@ -216,7 +222,7 @@ class Simulate:
     
     def is_acceptable_interval(self, interval, fixed, flag):
         initial, final = interval
-        
+        # print(interval)
         whole_model = copy.deepcopy(self.model)
         halves_model = copy.deepcopy(self.model)
         # print(whole_model,halves_model)
@@ -248,11 +254,11 @@ class Simulate:
 
 
     def run_interval(self, aux_model, moist_value, load_value):
-        # print(moist_value,load_value)
-        aux_model.normalized_moisture = (moist_value-30)/45
+        
+        aux_model.normalized_moisture = (moist_value)
         
         aux_model.load = load_value
-        # print("aqui",aux_model.load,aux_model.normalized_moisture)
+        
 
         aux_model.update_total_strain()
         
@@ -261,9 +267,7 @@ class Simulate:
         aux_model.update_slip_strain()
         
         aux_model.update_total_strain()
-        # print(aux_model.total_strain)
-        
-    
+           
         return aux_model
     
     
@@ -271,10 +275,11 @@ class Simulate:
         # print(interval)
         dt = (interval[1]-interval[0])/steps
         self.model.update_total_strain()
-        self.model.normalized_moisture = (self.current_moist-30)/45
+        self.model.normalized_moisture = (self.current_moist)
         self.current_time = interval[0]
-        current_J = (self.model.J_min +self.model.J_lin_coeff*(self.current_moist-30)/45)
-        current_D = (self.model.D_min +self.model.D_lin_coeff*(self.current_moist-30)/45)
+        current_J = (self.model.J_min +self.model.J_lin_coeff*(self.current_moist))
+        current_D = (self.model.D_min +self.model.D_lin_coeff*(self.current_moist))
+        # print("computing strain", current_J,current_D,self.current_moist)
         # print(interval)
         if dt*steps < 0.005:
             return
@@ -282,7 +287,7 @@ class Simulate:
             for i in np.arange(steps):
                 
                 # print(self.model.local_creep)
-                forces = (self.model.total_strain - self.model.local_slip - self.model.local_creep - self.model.sys_var.get("alpha")*(self.current_moist-30)/45)/current_D
+                forces = (self.model.total_strain - self.model.local_slip - self.model.local_creep - self.model.sys_var.get("alpha")*(self.current_moist))/current_D
                
                 self.model.local_creep += (forces*current_J - self.model.local_creep)*(1-np.exp(-dt/self.model.sys_var.get("tau")))
                 self.model.slip_avalanche()
@@ -309,7 +314,6 @@ class Simulate:
         
         
         
-    
     
             
             
