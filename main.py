@@ -13,17 +13,16 @@ from Sim_class import Simulate
 import matplotlib.pyplot as plt
 import pandas as pd
 import argparse
+import matplotlib.font_manager as fm
 
+# Add the font path explicitly
+font_path = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
+fm.fontManager.addfont(font_path)
+prop = fm.FontProperties(fname=font_path)
 
-# file_path = "input_dubois_opt1.txt"
+# Set the font properties globally
+plt.rcParams['font.family'] = prop.get_name()
 
-# strength_model = Model(file_path)
-
-# strength_model.max_slip = 1
-
-# strength_sim = Simulate(strength_model)
-
-# load_st , disp_st = strength_sim.run_strength()
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--filename", help="Input file name")
@@ -50,18 +49,15 @@ df = pd.DataFrame({
 df.to_csv("time.csv")
 
 
-df_valendo=pd.read_csv("/local/home/jortiz/ownCloud - Julio OrtizAmandodeBarros (jortiz@student.ethz.ch)@polybox.ethz.ch/FBM/Results/Results/Fitting_dubois/Default Dataset.csv")
-
 plt.figure()
 plt.plot(main_sim.History["Time"],main_sim.History["Total_strain"])
-plt.plot(df_valendo["x-1"],df_valendo["y-1"])
 plt.savefig("result.png")
 
 plt.figure()
-plt.plot(main_sim.History["Time"],np.array(main_sim.History["Slip_strain"])/40000)
+plt.plot(main_sim.History["Time"],np.array(main_sim.History["Slip_strain"])/main_model.sys_var.get("N"))
+plt.show()
 
-# plt.xlim(15,35)
-# plt.ylim(0.000025,0.00003)
         
+
 
 
